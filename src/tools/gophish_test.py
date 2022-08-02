@@ -47,16 +47,17 @@ def get_campaigns(api, assessment_id):
     """Return a list of all campaigns in an assessment."""
     logging.info("Gathering Campaigns")
     allCampaigns = api.campaigns.get()
-    assessmentCampaigns = list()
+    assessmentCampaigns = [
+        campaign
+        for campaign in allCampaigns
+        if campaign.name.startswith(assessment_id)
+    ]
 
-    for campaign in allCampaigns:
-        if campaign.name.startswith(assessment_id):
-            assessmentCampaigns.append(campaign)
 
     # Sets err to true if assessmentCampaigns has 0 length.
     logging.debug(f"Num Campaigns: {len(assessmentCampaigns)}")
     if not len(assessmentCampaigns):
-        logging.warning("No Campaigns found for {}".format(assessment_id))
+        logging.warning(f"No Campaigns found for {assessment_id}")
 
     return assessmentCampaigns
 
@@ -67,10 +68,10 @@ def add_group(api, assessment_id):
 
     newGroup = Group()
 
-    newGroup.name = "Test-" + assessment_id
+    newGroup.name = f"Test-{assessment_id}"
 
     # Holds list of Users to be added to group.
-    targets = list()
+    targets = []
 
     target = User()
     target.first_name = get_input("Enter First Name: ")
@@ -106,7 +107,7 @@ def campaign_test(api, assessmentCampaigns, assessment_id):
 
     for campaign in assessmentCampaigns:
         tempUrl = campaign.url
-        tempName = "Test-" + campaign.name
+        tempName = f"Test-{campaign.name}"
         tempPage = Page(name=campaign.page.name)
         tempTemplate = Template(name=campaign.template.name)
         tempSmtp = SMTP(name=campaign.smtp.name)
@@ -121,7 +122,7 @@ def campaign_test(api, assessmentCampaigns, assessment_id):
         )
 
         postCampaign = api.campaigns.post(postCampaign)
-        logging.debug("Test Campaign added: {}".format(postCampaign.name))
+        logging.debug(f"Test Campaign added: {postCampaign.name}")
 
     logging.info("All Test campaigns added.")
 
@@ -140,16 +141,15 @@ def main() -> None:
         )
     except ValueError:
         logging.critical(
-            '"{}"is not a valid logging level.  Possible values are debug, info, warning, and error.'.format(
-                log_level
-            )
+            f'"{log_level}"is not a valid logging level.  Possible values are debug, info, warning, and error.'
         )
+
         sys.exit(1)
 
     # Connect to API
     try:
         api = connect_api(args["API_KEY"], args["SERVER"])
-        logging.debug("Connected to: {}".format(args["SERVER"]))
+        logging.debug(f'Connected to: {args["SERVER"]}')
     except Exception as e:
         logging.critical(e.args[0])
         sys.exit(1)

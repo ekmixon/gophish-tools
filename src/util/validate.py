@@ -38,10 +38,7 @@ def validate_email(email):
 
 def validate_domain(email, domains):
     """Check that the domain matches that of the assessment."""
-    if email.split("@")[1].lower() in domains:
-        return True
-
-    return False
+    return email.split("@")[1].lower() in domains
 
 
 def email_import_validation(import_temp):

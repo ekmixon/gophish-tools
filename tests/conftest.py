@@ -236,20 +236,19 @@ def assessment_object(group_object, page_object, campaign_object):
 @pytest.fixture
 def multiple_campaign_object(template_object, smtp_object):
     """Return list of campaign objects."""
-    campaigns = list()
-
-    for x in range(1, 8):
-        campaigns.append(
-            Campaign(
-                name=f"RVXXX1-C{x}",
-                launch_date=f"01/0{x}/2025 13:00",
-                completed_date=f"01/0{x}/2025 14:00",
-                url=f"http://bad.domain/camp{x}",
-                group_name="RVXXX1-G1",
-                template=template_object,
-                smtp=smtp_object,
-            )
+    campaigns = [
+        Campaign(
+            name=f"RVXXX1-C{x}",
+            launch_date=f"01/0{x}/2025 13:00",
+            completed_date=f"01/0{x}/2025 14:00",
+            url=f"http://bad.domain/camp{x}",
+            group_name="RVXXX1-G1",
+            template=template_object,
+            smtp=smtp_object,
         )
+        for x in range(1, 8)
+    ]
+
 
     # Make a campaign from a different assessment.
     campaigns[6].name = "RVXXX2-C7"
@@ -260,94 +259,84 @@ def multiple_campaign_object(template_object, smtp_object):
 @pytest.fixture
 def multiple_gophish_group_object():
     """Return list of GoPhish group objects."""
-    groups = list()
-
-    for x in range(1, 3):
-        groups.append(
-            GoPhish_Group(
-                group_id={x},
-                name=f"RVXXX1-G{x}",
-                targets=[
-                    GoPhish_User(
-                        first_name="Jane",
-                        last_name="Smith",
-                        email=f"jane.smith{x}@domain.tld",
-                        position="IT",
-                    ),
-                    GoPhish_User(
-                        first_name="John",
-                        last_name="Doe",
-                        email=f"john.doe{x}@domain.tld",
-                        position="HR",
-                    ),
-                ],
-            )
+    return [
+        GoPhish_Group(
+            group_id={x},
+            name=f"RVXXX1-G{x}",
+            targets=[
+                GoPhish_User(
+                    first_name="Jane",
+                    last_name="Smith",
+                    email=f"jane.smith{x}@domain.tld",
+                    position="IT",
+                ),
+                GoPhish_User(
+                    first_name="John",
+                    last_name="Doe",
+                    email=f"john.doe{x}@domain.tld",
+                    position="HR",
+                ),
+            ],
         )
-
-    return groups
+        for x in range(1, 3)
+    ]
 
 
 @pytest.fixture
 def email_target_json():
     """Return a email target JSON with 4 emails matching the GoPhish group object."""
-    targets = list()
-    for (email, position) in [
-        ("jane.smith1@domain.tld", "IT"),
-        ("john.doe1@domain.tld", "HR"),
-        ("jane.smith2@domain.tld", "IT"),
-        ("john.doe2@domain.tld", "HR"),
-    ]:
-        targets.append(
-            {
-                "id": hashlib.sha256(email.encode("utf-8")).hexdigest(),
-                "customer_defined_labels": {"RVXXX1": [position]},
-            }
-        )
-
-    return targets
+    return [
+        {
+            "id": hashlib.sha256(email.encode("utf-8")).hexdigest(),
+            "customer_defined_labels": {"RVXXX1": [position]},
+        }
+        for email, position in [
+            ("jane.smith1@domain.tld", "IT"),
+            ("john.doe1@domain.tld", "HR"),
+            ("jane.smith2@domain.tld", "IT"),
+            ("john.doe2@domain.tld", "HR"),
+        ]
+    ]
 
 
 @pytest.fixture
 def multiple_click_object():
     """Return a list of clicks to match the correct number of unique users."""
-    clicks = list()
-    for x in range(0, 2):
-        clicks.append(
-            Click(
-                message="Testing",
-                user="jane.smith1@domain.tld",
-                source_ip="10.0.0.0",
-                time="01/01/2025 13:00",
-                application="NA",
+    clicks = []
+    for _ in range(2):
+        clicks.extend(
+            (
+                Click(
+                    message="Testing",
+                    user="jane.smith1@domain.tld",
+                    source_ip="10.0.0.0",
+                    time="01/01/2025 13:00",
+                    application="NA",
+                ),
+                Click(
+                    message="Testing",
+                    user="john.doe1@domain.tld",
+                    source_ip="10.0.0.1",
+                    time="01/01/2025 13:00",
+                    application="NA",
+                ),
+                Click(
+                    message="Testing",
+                    user="jane.smith2@domain.tld",
+                    source_ip="10.0.0.2",
+                    time="01/01/2025 13:00",
+                    application="NA",
+                ),
+                Click(
+                    message="Testing",
+                    user="john.doe2@domain.tld",
+                    source_ip="10.0.0.3",
+                    time="01/01/2025 13:00",
+                    application="NA",
+                ),
             )
         )
-        clicks.append(
-            Click(
-                message="Testing",
-                user="john.doe1@domain.tld",
-                source_ip="10.0.0.1",
-                time="01/01/2025 13:00",
-                application="NA",
-            )
-        )
-        clicks.append(
-            Click(
-                message="Testing",
-                user="jane.smith2@domain.tld",
-                source_ip="10.0.0.2",
-                time="01/01/2025 13:00",
-                application="NA",
-            )
-        )
-        clicks.append(
-            Click(
-                message="Testing",
-                user="john.doe2@domain.tld",
-                source_ip="10.0.0.3",
-                time="01/01/2025 13:00",
-                application="NA",
-            )
-        )
+
     return clicks
 
 

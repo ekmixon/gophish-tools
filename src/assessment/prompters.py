@@ -9,6 +9,6 @@ from util.validate import BlankInputValidator
 
 def main():
     """Return a URL prompt."""
-    url = prompt("Campaign URL: ", default="domain", validator=BlankInputValidator())
-
-    return url
+    return prompt(
+        "Campaign URL: ", default="domain", validator=BlankInputValidator()
+    )

@@ -153,7 +153,7 @@ class Target(Model):
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
-        if "position" in kwargs.keys():
+        if "position" in kwargs:
             setattr(self, "position", kwargs["position"])
 
     @classmethod

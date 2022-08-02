@@ -53,10 +53,10 @@ def load_landings(api, assessment):
             new_page.redirect_url = page["redirect_url"]
 
         # Debug page information
-        logging.debug("Page Name: {}".format(new_page.name))
-        logging.debug("Redirect ULR: {}".format(new_page.redirect_url))
-        logging.debug("Capture Credentials: {}".format(new_page.capture_credentials))
-        logging.debug("Capture Passwords: {}".format(new_page.capture_passwords))
+        logging.debug(f"Page Name: {new_page.name}")
+        logging.debug(f"Redirect ULR: {new_page.redirect_url}")
+        logging.debug(f"Capture Credentials: {new_page.capture_credentials}")
+        logging.debug(f"Capture Passwords: {new_page.capture_passwords}")
 
         """
          Catches when a page has already been loaded into GoPhish.
@@ -133,7 +133,7 @@ def load_groups(api, assessment):
 
         group["id"] = new_group.id
 
-        logging.info("Group Ready: {}\n".format(new_group.name))
+        logging.info(f"Group Ready: {new_group.name}\n")
 
     return groups
 
@@ -261,15 +261,14 @@ def main() -> None:
         )
     except ValueError:
         logging.critical(
-            '"{}"is not a valid logging level.  Possible values are debug, info, warning, and error.'.format(
-                log_level
-            )
+            f'"{log_level}"is not a valid logging level.  Possible values are debug, info, warning, and error.'
         )
+
         sys.exit(1)
 
     try:
         api = connect_api(args["API_KEY"], args["SERVER"])
-        logging.debug("Connected to: {}".format(args["SERVER"]))
+        logging.debug(f'Connected to: {args["SERVER"]}')
     except Exception as e:
         logging.critical(e.args[0])
         # Stop logging and clean up
@@ -280,17 +279,11 @@ def main() -> None:
     try:
         with open(args["ASSESSMENT_FILE"]) as json_file:
             assessment = json.load(json_file)
-    except FileNotFoundError as e:
+    except (FileNotFoundError, PermissionError) as e:
         logging.error(f"{e}\n")
         # Stop logging and clean up
         logging.shutdown()
         sys.exit(1)
-    except PermissionError as e:
-        logging.error(f"{e}\n")
-        # Stop logging and clean up
-        logging.shutdown()
-        sys.exit(1)
-
     try:
         # Load Landing page
         assessment["pages"] = load_landings(api, assessment)

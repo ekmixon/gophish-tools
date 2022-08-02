@@ -83,16 +83,14 @@ def get_campaigns(api, assessment_id=""):
     """
     allCampaigns = api.campaigns.get()
 
-    assessmentCampaigns = dict()
-
-    for campaign in allCampaigns:
-        if campaign.name.startswith(assessment_id):
-            assessmentCampaigns[campaign.id] = campaign.name
-
-    if len(assessmentCampaigns) == 0:
+    if assessmentCampaigns := {
+        campaign.id: campaign.name
+        for campaign in allCampaigns
+        if campaign.name.startswith(assessment_id)
+    }:
+        return assessmentCampaigns
+    else:
         raise LookupError(f"No campaigns found for assessment {assessment_id}")
-
-    return assessmentCampaigns
 
 
 def select_campaign(campaigns):
@@ -109,9 +107,8 @@ def select_campaign(campaigns):
         inputId = get_number("ID: ")
         if inputId in campaigns:
             break
-        else:
-            logging.warning("Bad Campaign ID")
-            print("Try again...")
+        logging.warning("Bad Campaign ID")
+        print("Try again...")
 
     return inputId
 
@@ -194,10 +191,7 @@ def main() -> None:
         logging.error(err)
         sys.exit(1)
 
-    if args["--summary-only"]:
-        # Output summary only.
-        print_summary(api, campaign_id)
-    else:
+    if not args["--summary-only"]:
         # Complete and output summary.
         try:
             complete_campaign(args["API_KEY"], args["SERVER"], campaign_id)
@@ -206,4 +200,5 @@ def main() -> None:
             logging.warning(err)
             sys.exit(1)
 
-        print_summary(api, campaign_id)
+    # Output summary only.
+    print_summary(api, campaign_id)

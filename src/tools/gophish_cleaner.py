@@ -50,29 +50,19 @@ def confirm_id(element, assessment_id):
     while True:
         if element != "assessment":
             logging.warning(
-                "NOTE: THIS WILL REMOVE ALL {} DATA ASSOCIATED WITH ASSESSMENT {}".format(
-                    element.upper(), assessment_id
-                )
+                f"NOTE: THIS WILL REMOVE ALL {element.upper()} DATA ASSOCIATED WITH ASSESSMENT {assessment_id}"
             )
-            # Bandit complains about the input() function, but it is safe to
-            # use in Python 3, which is required by this project.
-            confirm = input("Is this really what you want to do?(y/n) ")  # nosec
 
         else:
             logging.warning(
-                "NOTE: THIS WILL REMOVE ALL DATA ASSOCIATED WITH ASSESSMENT {}".format(
-                    assessment_id
-                )
+                f"NOTE: THIS WILL REMOVE ALL DATA ASSOCIATED WITH ASSESSMENT {assessment_id}"
             )
-            # Bandit complains about the input() function, but it is safe to
-            # use in Python 3, which is required by this project.
-            confirm = input("Is this really what you want to do?(y/n) ")  # nosec
 
-        if confirm.lower() == "y":
-            return True
+        # Bandit complains about the input() function, but it is safe to
+        # use in Python 3, which is required by this project.
+        confirm = input("Is this really what you want to do?(y/n) ")  # nosec
 
-        else:
-            return False
+        return confirm.lower() == "y"
 
 
 def remove_assessment(api, assessment_id):
@@ -84,13 +74,10 @@ def remove_assessment(api, assessment_id):
         or not remove_template(api, assessment_id)
         or not remove_page(api, assessment_id)
     ):
-        success = False
+        return False
 
-    else:
-        logging.info("Successfully removed all elements of {}".format(assessment_id))
-        success = True
-
-    return success
+    logging.info(f"Successfully removed all elements of {assessment_id}")
+    return True
 
 
 def remove_campaigns(api, assessment_id):
@@ -160,17 +147,16 @@ def main() -> None:
         )
     except ValueError:
         logging.critical(
-            '"{}"is not a valid logging level.  Possible values are debug, info, warning, and error.'.format(
-                log_level
-            )
+            f'"{log_level}"is not a valid logging level.  Possible values are debug, info, warning, and error.'
         )
+
         sys.exit(1)
 
     else:
         # Connect to API
         try:
             api = connect_api(args["API_KEY"], args["SERVER"])
-            logging.debug("Connected to: {}".format(args["SERVER"]))
+            logging.debug(f'Connected to: {args["SERVER"]}')
         except Exception as e:
             logging.critical(e.args[0])
             sys.exit(1)

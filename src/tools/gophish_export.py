@@ -52,11 +52,9 @@ def assessment_exists(api, assessment_id):
         boolean: Indicates if a campaign is found starting with assessment_id.
     """
     allCampaigns = api.campaigns.get()
-    for campaign in allCampaigns:
-        if campaign.name.startswith(assessment_id):
-            return True
-
-    return False
+    return any(
+        campaign.name.startswith(assessment_id) for campaign in allCampaigns
+    )
 
 
 def export_targets(api, assessment_id):
@@ -76,7 +74,7 @@ def export_targets(api, assessment_id):
     """
     groupIDs = get_group_ids(api, assessment_id)
 
-    targets = list()
+    targets = []
 
     for group_id in groupIDs:
         # Gets target list for parsing.
@@ -84,12 +82,13 @@ def export_targets(api, assessment_id):
 
         for raw_target in raw_targets:
 
-            target = dict()
+            target = {
+                "id": hashlib.sha256(
+                    raw_target["email"].encode("utf-8")
+                ).hexdigest(),
+                "customer_defined_labels": {},
+            }
 
-            target["id"] = hashlib.sha256(
-                raw_target["email"].encode("utf-8")
-            ).hexdigest()
-            target["customer_defined_labels"] = dict()
 
             if "position" in raw_target:
                 target["customer_defined_labels"][assessment_id] = [
@@ -106,7 +105,7 @@ def export_targets(api, assessment_id):
 def get_group_ids(api, assessment_id):
     """Return a list of group IDs for all groups starting with specified assessment_id."""
     rawGroup = api.groups.get()  # Holds raw list of campaigns from GoPhish.
-    groups = list()  # Holds list of campaign IDs that match the assessment.
+    groups = []
 
     for group in rawGroup:
         group = group.as_dict()
@@ -127,10 +126,10 @@ def export_campaigns(api, assessment_id):
         List of the assessment's campaigns with data.
     """
     campaignIDs = get_campaign_ids(api, assessment_id)
-    campaigns = list()
+    campaigns = [
+        get_campaign_data(api, campaign_id) for campaign_id in campaignIDs
+    ]
 
-    for campaign_id in campaignIDs:
-        campaigns.append(get_campaign_data(api, campaign_id))
 
     logging.info(f"{len(campaigns)} campaigns found for assessment {assessment_id}.")
 
@@ -140,7 +139,7 @@ def export_campaigns(api, assessment_id):
 def get_campaign_ids(api, assessment_id):
     """Return a list of campaign IDs for all campaigns starting with specified assessment_id."""
     rawCampaigns = api.campaigns.get()  # Holds raw list of campaigns from GoPhish.
-    campaigns = list()  # Holds list of campaign IDs that match the assessment.
+    campaigns = []
 
     for campaign in rawCampaigns:
         campaign = campaign.as_dict()
@@ -152,23 +151,19 @@ def get_campaign_ids(api, assessment_id):
 
 def get_campaign_data(api, campaign_id):
     """Return campaign metadata for the given campaign ID."""
-    campaign = dict()
-
     # Pulls the campaign data as dict from GoPhish.
     rawCampaign: dict = api.campaigns.get(campaign_id).as_dict()
 
-    campaign["id"] = rawCampaign["name"]
-
-    campaign["start_time"] = rawCampaign["launch_date"]
-    campaign["end_time"] = rawCampaign["completed_date"]
-    campaign["url"] = rawCampaign["url"]
-
-    campaign["subject"] = rawCampaign["template"]["subject"]
-
-    # Get the template ID from the GoPhish template name.
-    campaign["template"] = (
-        api.templates.get(rawCampaign["template"]["id"]).as_dict()["name"].split("-")[2]
-    )
+    campaign = {
+        "id": rawCampaign["name"],
+        "start_time": rawCampaign["launch_date"],
+        "end_time": rawCampaign["completed_date"],
+        "url": rawCampaign["url"],
+        "subject": rawCampaign["template"]["subject"],
+        "template": api.templates.get(rawCampaign["template"]["id"])
+        .as_dict()["name"]
+        .split("-")[2],
+    }
 
     campaign["clicks"] = get_click_data(api, campaign_id)
 
@@ -181,16 +176,17 @@ def get_campaign_data(api, campaign_id):
 def get_click_data(api, campaign_id):
     """Return a list of all clicks for a given campaign."""
     rawEvents = api.campaigns.get(campaign_id).as_dict()["timeline"]
-    clicks = list()  # Holds list of all users that clicked.
+    clicks = []
 
     for rawEvent in rawEvents:
         if rawEvent["message"] == "Clicked Link":
-            click = dict()
+            click = {
+                "user": hashlib.sha256(
+                    rawEvent["email"].encode("utf-8")
+                ).hexdigest()
+            }
 
-            # Builds out click document.
-            click["user"] = hashlib.sha256(
-                rawEvent["email"].encode("utf-8")
-            ).hexdigest()
+
             click["source_ip"] = rawEvent["details"]["browser"]["address"]
 
             click["time"] = rawEvent["time"]
@@ -205,9 +201,9 @@ def get_click_data(api, campaign_id):
 def get_email_status(api, campaign_id):
     """Return the email send status and time."""
     rawEvents = api.campaigns.get(campaign_id).as_dict()["timeline"]
-    status = list()
+    status = []
     for rawEvent in rawEvents:
-        email = dict()
+        email = {}
 
         if rawEvent["message"] == "Email Sent":
             email["user"] = hashlib.sha256(
@@ -240,9 +236,7 @@ def get_email_status(api, campaign_id):
 
 def get_application(rawEvent):
     """Return application details."""
-    application = dict()
-
-    application["external_ip"] = rawEvent["details"]["browser"]["address"]
+    application = {"external_ip": rawEvent["details"]["browser"]["address"]}
 
     # Process user agent string.
     userAgent = rawEvent["details"]["browser"]["user-agent"]
@@ -254,9 +248,7 @@ def get_application(rawEvent):
 
 def find_unique_target_clicks_count(clicks):
     """Return the number of unique clicks in a click set."""
-    uniq_users = set()
-    for click in clicks:
-        uniq_users.add(click["user"])
+    uniq_users = {click["user"] for click in clicks}
     return len(uniq_users)
 
 
@@ -271,57 +263,55 @@ def write_campaign_summary(api, assessment_id):
         campaign_data = json.load(template)
 
     logging.info("Writing campaign summary report to %s", campaign_summary_textfile)
-    file_out = open(campaign_summary_textfile, "w+")
-    file_out.write("Campaigns for Assessment: " + assessment_id)
+    with open(campaign_summary_textfile, "w+") as file_out:
+        file_out.write(f"Campaigns for Assessment: {assessment_id}")
 
-    regex = re.compile(r"^.*_(?P<level>level-[1-6])$")
-    for campaign_id in campaign_ids:
-        campaign = api.campaigns.get(campaign_id)
-        match = regex.fullmatch(campaign.name)
-        if match:
-            level = match.group("level")
-        else:
-            logging.warn(
-                "Encountered campaign (%s) that is unable to be processed for campaign summary export. \n"
-                "Campaign name is not properly suffixed with the campaign level number (e.g. '_level-1')\n"
-                "Skipping campaign",
-                campaign.name,
+        regex = re.compile(r"^.*_(?P<level>level-[1-6])$")
+        for campaign_id in campaign_ids:
+            campaign = api.campaigns.get(campaign_id)
+            if match := regex.fullmatch(campaign.name):
+                level = match["level"]
+            else:
+                logging.warn(
+                    "Encountered campaign (%s) that is unable to be processed for campaign summary export. \n"
+                    "Campaign name is not properly suffixed with the campaign level number (e.g. '_level-1')\n"
+                    "Skipping campaign",
+                    campaign.name,
+                )
+                continue
+
+            logging.info(level)
+            clicks = get_click_data(api, campaign_id)
+
+            total_clicks = api.campaigns.summary(campaign_id=campaign_id).stats.clicked
+            unique_clicks = find_unique_target_clicks_count(clicks)
+            if total_clicks > 0:
+                percent_clicks = unique_clicks / float(total_clicks)
+            else:
+                percent_clicks = 0.0
+            campaign_data[level]["subject"] = campaign.template.subject
+            campaign_data[level]["sender"] = campaign.smtp.from_address
+            campaign_data[level]["start_date"] = campaign.launch_date
+            campaign_data[level]["end_date"] = campaign.completed_date
+            campaign_data[level]["redirect"] = campaign.url
+            campaign_data[level]["clicks"] = total_clicks
+            campaign_data[level]["unique_clicks"] = unique_clicks
+            campaign_data[level]["percent_clicks"] = percent_clicks
+
+            file_out.write("\n")
+            file_out.write("-" * 50)
+            file_out.write("\nCampaign: %s" % campaign.name)
+            file_out.write("\nSubject: %s" % campaign_data[level]["subject"])
+            file_out.write("\nSender: %s" % campaign_data[level]["sender"])
+            file_out.write("\nStart Date: %s" % campaign_data[level]["start_date"])
+            file_out.write("\nEnd Date: %s" % campaign_data[level]["end_date"])
+            file_out.write("\nRedirect: %s" % campaign_data[level]["redirect"])
+            file_out.write("\nClicks: %i" % campaign_data[level]["clicks"])
+            file_out.write("\nUnique Clicks: %i" % campaign_data[level]["unique_clicks"])
+            file_out.write(
+                "\nPercentage Clicks: %f" % campaign_data[level]["percent_clicks"]
             )
-            continue
 
-        logging.info(level)
-        clicks = get_click_data(api, campaign_id)
-
-        total_clicks = api.campaigns.summary(campaign_id=campaign_id).stats.clicked
-        unique_clicks = find_unique_target_clicks_count(clicks)
-        if total_clicks > 0:
-            percent_clicks = unique_clicks / float(total_clicks)
-        else:
-            percent_clicks = 0.0
-        campaign_data[level]["subject"] = campaign.template.subject
-        campaign_data[level]["sender"] = campaign.smtp.from_address
-        campaign_data[level]["start_date"] = campaign.launch_date
-        campaign_data[level]["end_date"] = campaign.completed_date
-        campaign_data[level]["redirect"] = campaign.url
-        campaign_data[level]["clicks"] = total_clicks
-        campaign_data[level]["unique_clicks"] = unique_clicks
-        campaign_data[level]["percent_clicks"] = percent_clicks
-
-        file_out.write("\n")
-        file_out.write("-" * 50)
-        file_out.write("\nCampaign: %s" % campaign.name)
-        file_out.write("\nSubject: %s" % campaign_data[level]["subject"])
-        file_out.write("\nSender: %s" % campaign_data[level]["sender"])
-        file_out.write("\nStart Date: %s" % campaign_data[level]["start_date"])
-        file_out.write("\nEnd Date: %s" % campaign_data[level]["end_date"])
-        file_out.write("\nRedirect: %s" % campaign_data[level]["redirect"])
-        file_out.write("\nClicks: %i" % campaign_data[level]["clicks"])
-        file_out.write("\nUnique Clicks: %i" % campaign_data[level]["unique_clicks"])
-        file_out.write(
-            "\nPercentage Clicks: %f" % campaign_data[level]["percent_clicks"]
-        )
-
-    file_out.close()
     logging.info("Writing out summary JSON to %s", campaign_summary_json)
     with open(campaign_summary_json, "w") as fp:
         json.dump(campaign_data, fp, indent=4)
@@ -333,7 +323,6 @@ def export_user_reports(api, assessment_id):
 
     for campaign_id in campaign_ids:
         first_report = None
-        user_report_doc = dict()
         campaign = get_campaign_data(api, campaign_id)
 
         # iterate over clicks and find the earliest click
@@ -344,19 +333,16 @@ def export_user_reports(api, assessment_id):
             if first_report is None or click_time < first_report:
                 first_report = click_time
 
-        # The "customer" field is a placeholder added for operator convenience when
-        # working with the JSON file created.
-        user_report_doc["customer"] = ""
-        user_report_doc["assessment"] = assessment_id
-        # get_campaign_ids() returns integers, but user_report_doc["campaign"]
-        # expects a string
-        user_report_doc["campaign"] = str(campaign_id)
-        if first_report is not None:
-            user_report_doc["first_report"] = datetime.strftime(
+        user_report_doc = {
+            "customer": "",
+            "assessment": assessment_id,
+            "campaign": str(campaign_id),
+            "first_report": datetime.strftime(
                 first_report, "%Y-%m-%dT%H:%M:%S"
             )
-        else:
-            user_report_doc["first_report"] = "No clicks reported"
+            if first_report is not None
+            else "No clicks reported",
+        }
 
         user_report_doc["total_num_reports"] = api.campaigns.summary(
             campaign_id=campaign_id
@@ -396,10 +382,7 @@ def main() -> None:
             sys.exit(1)
 
     if assessment_exists(api, args["ASSESSMENT_ID"]):
-        assessment_dict: Dict = dict()
-
-        # Add targets list to assessment dict.
-        assessment_dict["targets"] = export_targets(api, args["ASSESSMENT_ID"])
+        assessment_dict: Dict = {"targets": export_targets(api, args["ASSESSMENT_ID"])}
 
         # Add campaigns list to the assessment dict.
         assessment_dict["campaigns"] = export_campaigns(api, args["ASSESSMENT_ID"])

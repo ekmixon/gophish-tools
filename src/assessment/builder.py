@@ -59,10 +59,11 @@ def set_time_zone():
     # TODO Allow for a select more option to get access to full list of Time Zones
 
     # Creates list of US Time Zones
-    time_zone = list()
-    for zone in pytz.common_timezones:
-        if zone.startswith("US/"):
-            time_zone.append((zone, zone))
+    time_zone = [
+        (zone, zone)
+        for zone in pytz.common_timezones
+        if zone.startswith("US/")
+    ]
 
     # Ask user to select time zone from list.
     return radiolist_dialog(
@@ -78,7 +79,7 @@ def display_list_groups(assessment):
     # Prints groups or No Groups message
     if assessment.groups:
         for index, temp_group in enumerate(assessment.groups):
-            print("\t{}\t{}".format(index + 1, temp_group.name))
+            print(f"\t{index + 1}\t{temp_group.name}")
     else:
         print("\t--NO GROUPS--")
 
@@ -93,7 +94,7 @@ def display_list_pages(assessment):
     # Prints pages or No pages message
     if assessment.pages:
         for index, temp_page in enumerate(assessment.pages):
-            print("\t{}\t{}".format(index + 1, temp_page.name))
+            print(f"\t{index + 1}\t{temp_page.name}")
     else:
         print("\t--NO PAGES--")
 
@@ -120,7 +121,7 @@ def build_assessment(assessment_id):
     assessment.groups = build_groups(assessment.id, assessment.target_domains)
 
     template_smtp = SMTP()
-    template_smtp.name = assessment.id + "-SP"
+    template_smtp.name = f"{assessment.id}-SP"
 
     # Sets up smtp host info to be pre-populated.
     template_smtp.host = prompt(
@@ -132,10 +133,10 @@ def build_assessment(assessment_id):
     template_smtp.username = input("SMTP User: ")  # nosec
     template_smtp.password = input("SMTP Password: ")  # nosec
 
-    assessment.campaigns = list()
+    assessment.campaigns = []
     logging.info("Building Campaigns")
     num_campaigns = get_number("    How many Campaigns?")
-    for campaign_number in range(0, num_campaigns):
+    for campaign_number in range(num_campaigns):
         campaign_data = build_campaigns(assessment, campaign_number + 1, template_smtp)
         assessment.campaigns.append(campaign_data)
 
@@ -174,13 +175,14 @@ def build_campaigns(assessment, campaign_number, template_smtp):
 
     campaign.url = prompt(
         "    Campaign URL: ",
-        default="http://" + assessment.domain,
+        default=f"http://{assessment.domain}",
         validator=BlankInputValidator(),
     )
 
+
     campaign = review_campaign(campaign)
 
-    logging.info("Successfully Added Campaign {}".format(campaign.name))
+    logging.info(f"Successfully Added Campaign {campaign.name}")
 
     return campaign
 
@@ -202,69 +204,68 @@ def review_campaign(campaign):
                 "group_name",
                 "page_name",
             ]:
-                print("{}: {}".format(field.replace("_", " ").title(), value))
+                print(f'{field.replace("_", " ").title()}: {value}')
             elif field == "smtp":
                 print("SMTP: ")
                 for smtp_key, smtp_value in campaign_dict["smtp"].items():
-                    print(
-                        "\t{}: {}".format(
-                            smtp_key.replace("_", " ").title(), smtp_value
-                        )
-                    )
+                    print(f'\t{smtp_key.replace("_", " ").title()}: {smtp_value}')
 
-        if yes_no_prompt("\nChanges Required") == "yes":
-            completer = WordCompleter(
-                campaign_dict.keys().remove("template"), ignore_case=True
-            )
-            # Loops to get valid Field name form user.
-            while True:
-                update_key = prompt(
-                    "Which Field: ",
-                    completer=completer,
-                    validator=BlankInputValidator(),
-                ).lower()
-                if update_key != "smtp":
-                    try:
-                        update_value = prompt(
-                            "{}: ".format(update_key),
-                            default=campaign_dict[update_key],
-                            validator=BlankInputValidator(),
-                        )
-                    except KeyError:
-                        logging.error("Incorrect Field!")
-                    else:
-                        setattr(campaign, update_key, update_value)
-                        break
-                else:
-                    # Builds a word completion list with each word of the option being capitalized.
-                    sub_completer = WordCompleter(
-                        list(
-                            map(
-                                lambda sub_field: sub_field.replace("_", " ").title(),
-                                campaign_dict[update_key].as_dict().keys(),
-                            )
-                        ),
-                        ignore_case=True,
-                    )
-                    update_sub = prompt(
-                        "Which Indicator: ",
-                        completer=sub_completer,
-                        validator=BlankInputValidator(),
-                    ).lower()
-                    try:
-                        update_value = prompt(
-                            "{}: ".format(update_sub),
-                            default=campaign_dict[update_key].as_dict()[update_sub],
-                            validator=BlankInputValidator(),
-                        )
-                    except KeyError:
-                        logging.error("Incorrect Field!")
-                    else:
-                        setattr(campaign_dict[update_key], update_sub, update_value)
-                        break
-        else:
+        if yes_no_prompt("\nChanges Required") != "yes":
             break
 
+        completer = WordCompleter(
+            campaign_dict.keys().remove("template"), ignore_case=True
+        )
+            # Loops to get valid Field name form user.
+        while True:
+            update_key = prompt(
+                "Which Field: ",
+                completer=completer,
+                validator=BlankInputValidator(),
+            ).lower()
+            if update_key != "smtp":
+                try:
+                    update_value = prompt(
+                        f"{update_key}: ",
+                        default=campaign_dict[update_key],
+                        validator=BlankInputValidator(),
+                    )
+
+                except KeyError:
+                    logging.error("Incorrect Field!")
+                else:
+                    setattr(campaign, update_key, update_value)
+                    break
+            else:
+                # Builds a word completion list with each word of the option being capitalized.
+                sub_completer = WordCompleter(
+                    list(
+                        map(
+                            lambda sub_field: sub_field.replace("_", " ").title(),
+                            campaign_dict[update_key].as_dict().keys(),
+                        )
+                    ),
+                    ignore_case=True,
+                )
+                update_sub = prompt(
+                    "Which Indicator: ",
+                    completer=sub_completer,
+                    validator=BlankInputValidator(),
+                ).lower()
+                try:
+                    update_value = prompt(
+                        f"{update_sub}: ",
+                        default=campaign_dict[update_key].as_dict()[
+                            update_sub
+                        ],
+                        validator=BlankInputValidator(),
+                    )
+
+                except KeyError:
+                    logging.error("Incorrect Field!")
+                else:
+                    setattr(campaign_dict[update_key], update_sub, update_value)
+                    break
     return campaign
 
 
@@ -272,7 +273,7 @@ def select_group(assessment):
     """Select a group."""
     # Select Group:
     if len(assessment.groups) == 1:  # If only one auto sets.
-        logging.info("Group auto set to {}".format(assessment.groups[0].name))
+        logging.info(f"Group auto set to {assessment.groups[0].name}")
         group_name = assessment.groups[0].name
     else:  # Allows user to choose from multiple groups;
         while True:
@@ -291,7 +292,7 @@ def select_group(assessment):
 def select_page(assessment):
     """Select a page."""
     if len(assessment.pages) == 1:  # If only one auto sets.
-        logging.info("Page auto set to {}".format(assessment.pages[0].name))
+        logging.info(f"Page auto set to {assessment.pages[0].name}")
         page_name = assessment.pages[0].name
     else:  # Allows user to choose from multiple pages
         while True:
@@ -321,19 +322,19 @@ def import_email(assessment, campaign_number, template_smtp):
             # Drops .json if included so it can always be added as fail safe.
             import_file_name = import_file_name.split(".", 1)[0]
 
-            with open(import_file_name + ".json") as importFile:
+            with open(f"{import_file_name}.json") as importFile:
                 import_temp = json.load(importFile)
 
             # Validates that all fields are present or raise MissingKey Error.
             email_import_validation(import_temp)
             break
         except EnvironmentError:
-            logging.critical("Import File not found: {}.json".format(import_file_name))
+            logging.critical(f"Import File not found: {import_file_name}.json")
             print("Please try again...")
 
         except MissingKey as e:
             # Logs and indicates the user should correct before clicking ok which will re-run the import.
-            logging.critical("Missing Field from import: {}".format(e.key))
+            logging.critical(f"Missing Field from import: {e.key}")
             message_dialog(
                 title="Missing Field",
                 text=f'Email import is missing the "{e.key}" field, please correct before clicking Ok.\n {e.key}: {e.description}',
@@ -356,7 +357,7 @@ def import_email(assessment, campaign_number, template_smtp):
 
 def create_email(assessment, campaign_number=""):
     """Create email."""
-    temp_template = Template(name=assessment.id + "-T" + str(campaign_number))
+    temp_template = Template(name=f"{assessment.id}-T{str(campaign_number)}")
     temp_smtp = SMTP(name=f"{assessment.id}-SP-{campaign_number}")
 
     # Receives the file name and checks if it exists.
@@ -366,7 +367,7 @@ def create_email(assessment, campaign_number=""):
             # Drops .html if included so it can always be added as fail safe.
             html_file_name = html_file_name.split(".", 1)[0]
 
-            with open(html_file_name + ".html") as htmlFile:
+            with open(f"{html_file_name}.html") as htmlFile:
                 temp_template.html = htmlFile.read()
 
             break
@@ -374,21 +375,19 @@ def create_email(assessment, campaign_number=""):
             logging.error(f"HTML Template File not found: {html_file_name}.html")
             print("Please try again...")
 
-        # Receives the file name and checks if it exists.
+            # Receives the file name and checks if it exists.
     while True:
         try:
             text_file_name = get_input("    Text Template File name:")
             # Drops .txt if included so it can always be added as fail safe.
             text_file_name = text_file_name.split(".", 1)[0]
 
-            with open(text_file_name + ".txt") as textFile:
+            with open(f"{text_file_name}.txt") as textFile:
                 temp_template.text = textFile.read()
 
             break
         except EnvironmentError:
-            logging.critical(
-                "Text Template File not found: {}.txt".format(text_file_name)
-            )
+            logging.critical(f"Text Template File not found: {text_file_name}.txt")
             print("Please try again...")
 
     return temp_smtp, temp_template
@@ -397,7 +396,7 @@ def create_email(assessment, campaign_number=""):
 def build_groups(id, target_domains):
     """Build groups."""
     logging.info("Getting Group Metadata")
-    groups = list()
+    groups = []
 
     # Looks through to get the number of groups as a number with error checking
     num_groups = get_number("    How many groups do you need?")
@@ -423,9 +422,9 @@ def build_groups(id, target_domains):
 def build_emails(domains, labels):
     """Build emails."""
     # Holds list of Users to be added to group.
-    targets = list()
-    domain_miss_match = list()
-    format_error = list()
+    targets = []
+    domain_miss_match = []
+    format_error = []
 
     # Receives the file name and checks if it exists.
     while True:
@@ -434,7 +433,7 @@ def build_emails(domains, labels):
             # Drops .csv if included so it can always be added as fail safe.
             email_file_name = email_file_name.split(".", 1)[0]
 
-            with open(email_file_name + ".csv") as csv_file:
+            with open(f"{email_file_name}.csv") as csv_file:
                 read_csv = csv.reader(csv_file, delimiter=",")
                 next(read_csv)
 
@@ -471,7 +470,7 @@ def build_emails(domains, labels):
                             target = target_add_label(labels, email, target)
                             targets.append(target)
                 else:
-                    logging.error("{} Formatting Errors".format(len(format_error)))
+                    logging.error(f"{len(format_error)} Formatting Errors")
                     if yes_no_prompt("Would you like to correct each here") == "yes":
                         for email in format_error:
                             email[2] = prompt(
@@ -501,9 +500,7 @@ def build_emails(domains, labels):
                             validator=EmailValidator(),
                         )
                 else:
-                    logging.error(
-                        "{} Domain Miss Match Errors".format(len(format_error))
-                    )
+                    logging.error(f"{len(format_error)} Domain Miss Match Errors")
                     if yes_no_prompt("Would you like to correct each here") == "yes":
                         for email in domain_miss_match:
                             while True:
@@ -526,11 +523,11 @@ def build_emails(domains, labels):
                             "Incorrectly formatted Emails will not be added, continuing..."
                         )
 
-            if len(targets) == 0:
+            if not targets:
                 raise Exception("No targets loaded")
             break
         except EnvironmentError:
-            logging.critical("Email File not found: {}.csv".format(email_file_name))
+            logging.critical(f"Email File not found: {email_file_name}.csv")
             print("\t Please try again...")
         except Exception:
             # Logs and indicates the user should correct before clicking ok which will re-run the import.
@@ -547,7 +544,7 @@ def build_emails(domains, labels):
 def target_add_label(labels, email, target):
     """Add a label to a target."""
     if labels == "yes" and not email[3]:
-        logging.error("Missing Label for {}".format(target.email))
+        logging.error(f"Missing Label for {target.email}")
         target.position = get_input("Please enter a label:")
     else:
         target.position = email[3]
@@ -559,7 +556,7 @@ def build_pages(id_):
 
     :return a page object
     """
-    pages = list()
+    pages = []
     logging.info("Getting Page Metadata")
 
     # Looks through to get the number of pages as a number with error checking
@@ -597,7 +594,7 @@ def build_pages(id_):
                     # Drops .html if included so it can always be added as fail safe.
                     landing_file_name = landing_file_name.split(".", 1)[0]
 
-                    with open(landing_file_name + ".html") as landingFile:
+                    with open(f"{landing_file_name}.html") as landingFile:
                         temp_page.html = landingFile.read()
 
                     break
@@ -624,35 +621,35 @@ def review_page(page):
     # Loops until not changes are required.
     while True:
         print("\n")
-        page_keys = list()
+        page_keys = []
         for key, value in page.as_dict().items():
             if key != "html":
-                print("{}: {}".format(key, value))
+                print(f"{key}: {value}")
                 page_keys.append(key)
-        if yes_no_prompt("Changes Required") == "yes":
-            completer = WordCompleter(page_keys, ignore_case=True)
+        if yes_no_prompt("Changes Required") != "yes":
+            break
+        completer = WordCompleter(page_keys, ignore_case=True)
 
             # Loops to get valid Field name form user.
-            while True:
-                update_key = prompt(
-                    "Which Field: ",
-                    completer=completer,
-                    validator=BlankInputValidator(),
-                ).lower()
+        while True:
+            update_key = prompt(
+                "Which Field: ",
+                completer=completer,
+                validator=BlankInputValidator(),
+            ).lower()
 
-                try:
-                    update_value = prompt(
-                        "{}: ".format(update_key),
-                        default=page.as_dict()[update_key],
-                        validator=BlankInputValidator(),
-                    )
-                except KeyError:
-                    logging.error("Incorrect Field!")
-                else:
-                    setattr(page, update_key, update_value)
-                    break
-        else:
-            break
+            try:
+                update_value = prompt(
+                    f"{update_key}: ",
+                    default=page.as_dict()[update_key],
+                    validator=BlankInputValidator(),
+                )
+
+            except KeyError:
+                logging.error("Incorrect Field!")
+            else:
+                setattr(page, update_key, update_value)
+                break
     return page
 
 
@@ -668,10 +665,9 @@ def main() -> None:
         )
     except ValueError:
         logging.critical(
-            '"{}"is not a valid logging level.  Possible values are debug, info, warning, and error.'.format(
-                log_level
-            )
+            f'"{log_level}"is not a valid logging level.  Possible values are debug, info, warning, and error.'
         )
+
         sys.exit(1)
 
     assessment = build_assessment(args["ASSESSMENT_ID"])
